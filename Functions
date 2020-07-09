@@ -1,0 +1,12 @@
+async function getValueFromView (name) {
+  const view = await getView(name);
+  var viewText;
+  if (await global.platformName == android) {
+    viewText = await view.getAttribute("text");
+  } else {
+    viewText = await view.getAttribute("value");
+  }
+  return viewText;
+}
+
+
