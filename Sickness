@@ -1,0 +1,451 @@
+const testingUtilities = require('../helpers/testingUtilities')
+const assertions = require('../helpers/assertions')
+const loginLogout = require('../helpers/loginLogout')
+const interactions = require('../helpers/interactions')
+
+var testCount = 0;
+var currentSicknessCount;
+var expectedStartDay;
+var isOngoingAbsence;
+
+beforeEach(async () => {
+    await loginLogout.login(loginLogout.users.admin);
+    console.log("🕑 Starting test: " + testCount);
+}); 
+
+ test('As an administrator, I can log 2nd half of a day sickness for myself', async () => {
+
+    criteria("Given I am logged in as an administrator");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+    await interactions.clickOn("profile_icon");
+    await testingUtilities.sleepNormal();
+
+    if (global.platformName == "android") await interactions.scrollDown(interactions.scrollValue.NORMAL);
+    await testingUtilities.sleepNormal();
+
+    if (global.platformName == "android") {
+        currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+    } else {
+        currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+    }
+    criteria(`And I have ${currentSicknessCount} sicknesses`);
+    await interactions.clickOn("Go back");
+
+    await interactions.clickOn("dashboard_fab");
+    criteria("When I log sickness");
+    await testingUtilities.sleepNormal();
+    
+    await assertions.viewIsPresent("add_sickness");
+    await interactions.clickOn("add_sickness");
+
+    criteria("And I am presented with users to add sickness for")
+    criteria("And I choose myself")
+    await testingUtilities.sleepShort();
+    await interactions.clickOnByText("subordinates_list", "Myself");
+
+    criteria("Then I am presented with the 'When does it start?' screen");
+    if (global.platformName == "android") {
+        await assertions.viewHasText("toolbar_title", "When did it start?");
+     } else {
+         await assertions.viewHasText("toolbar_title", "When does it start?");
+     }
+
+    isOngoingAbsence = await testingUtilities.getValueFromView("ongoing_absence_switch");
+    if (isOngoingAbsence == '1' || 'ON') await interactions.clickOn("ongoing_absence_switch");
+
+    await selectValidDays(1);
+    var sicknessDate = await testingUtilities.getValueFromView("start_date");
+    criteria(`And I select a sickness for ${sicknessDate}`);
+
+    await interactions.clickOnFAB();
+
+    criteria("Then I am presented with the 'What time?' screen");
+    await assertions.viewHasText("toolbar_title", "What time?");
+
+    criteria('When I select 2nd half of the day');
+    global.platformName == "android" ? await selectSicknessTime(2) : await interactions.clickOn("2nd half");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_subtitle", "0.5 days selected");
+
+    await interactions.clickOnFAB();
+
+    criteria("And I am presented with the summary screen");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_title", "Summary");
+    await assertions.viewHasText("summary_absence_type", "Sickness")
+
+    criteria("Then the values shown on summary screen should be correct")
+    global.platformName == "android" ? expectedStartDay = "2nd half" : expectedStartDay = "2nd Half"
+    await assertions.viewHasText("start_day_option", expectedStartDay);
+
+    await testingUtilities.sleepShort();
+    await assertions.viewHasText("start_date", sicknessDate);
+
+    criteria("When I confirm the sickness");
+    await interactions.clickOnFAB();
+
+    criteria("Then an additonal sickness should appear on my profile");
+    criteria(`And Admin should have ${sicknessIncrease} sicknesses`);
+    var sicknessIncrease = await getIncreasedSicknessValue(currentSicknessCount);
+    if (global.platformName == "android") {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+    await interactions.clickOn("toolbar_close");
+})  
+
+test("As as admin I can log 1st half of a day sickness for a fixed days employee", async () => {
+    criteria("Given I am logged in as an administrator");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+
+     global.platformName == "android" ? await interactions.clickOn("employees") : await interactions.clickOn("Employees");
+     await interactions.clickOnByText("subordinates_list","appium fixed day");
+     await testingUtilities.sleepNormal();
+
+     if (global.platformName == "android") {
+        await interactions.scrollDown(interactions.scrollValue.NORMAL);
+        currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+    } else {
+        currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+    }
+    criteria(`And a fixed days employee has ${sicknessIncrease} sicknesses`);
+
+    criteria("When I log a sickness for a fixed days employee");
+    if (global.platformName == "android") {
+        await interactions.clickOn("add");
+        await assertions.viewIsPresent("add_sickness");
+        await interactions.clickOn("add_sickness");
+    } else {
+        await interactions.clickOn("Add");
+        await assertions.viewIsPresent("Add sickness");
+        await interactions.clickOn("Add sickness");
+    }
+
+    await testingUtilities.sleepShort();
+    await interactions.clickOnByText("subordinates_list","appium fixed day");
+    await testingUtilities.sleepShort();
+
+    isOngoingAbsence = await testingUtilities.getValueFromView("ongoing_absence_switch");
+    if (isOngoingAbsence == '1' || 'ON') await interactions.clickOn("ongoing_absence_switch");
+  
+    await selectValidDays(1);
+    var sicknessDate = await testingUtilities.getValueFromView("start_date");
+    criteria(`And I select a sickness for ${sicknessDate}`);
+    await interactions.clickOnFAB();
+
+    criteria("Then I am presented with the 'What time?' screen");
+    await assertions.viewHasText("toolbar_title", "What time?");
+
+    criteria('When I add 1st half day of sickness');
+    global.platformName == "android" ? await selectSicknessTime(0) : await interactions.clickOn("1st half");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_subtitle", "0.5 days selected");
+    await interactions.clickOnFAB();
+
+    criteria("And I am presented with the summary screen");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_title", "Summary");
+    await assertions.viewHasText("summary_absence_type", "Sickness")
+
+    criteria("Then the values shown on summary screen should be correct")
+    global.platformName == "android" ? expectedStartDay = "1st half" : expectedStartDay = "1st Half"
+    await assertions.viewHasText("start_day_option", expectedStartDay);
+    await assertions.viewHasText("start_date", sicknessDate);
+    
+    criteria("When I confirm the sickness");
+    await interactions.clickOnFAB();
+
+    criteria("Then the employee should have an additonal sickness");
+    await testingUtilities.sleepShort();
+    var sicknessIncrease = await getIncreasedSicknessValue(currentSicknessCount);
+    if (global.platformName == "android") {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+    global.platformName == "android" ? await interactions.clickOn("close") : await interactions.clickOn("Close Screen");
+
+    await loginLogout.logout();
+    await loginLogout.login(loginLogout.users.fixedDays);
+
+    criteria("Given I am logged in as a fixed days employee");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+    await interactions.clickOn("profile_icon");
+    criteria("When I view sickness on my profile");
+    await testingUtilities.sleepShort();
+
+    criteria(`Then I should have ${sicknessIncrease} sicknesses`);
+    if (global.platformName == "android") {
+        await interactions.scrollDown(interactions.scrollValue.NORMAL);
+        await assertions.viewHasText("sicknesses_count", sicknessIncrease);
+        await interactions.clickOnByText("sickness_card", "Sicknesses");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        await assertions.viewHasText("sickness_count", sicknessIncrease);
+        await interactions.clickOn("sickness_card");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`); 
+    }
+
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+ }) 
+
+ test("As as admin I can log a full day sickness for a fixed hours employee", async () => {
+    criteria("Given I am logged in as an administrator");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+
+     global.platformName == "android" ? await interactions.clickOn("employees") : await interactions.clickOn("Employees");
+     await interactions.clickOnByText("subordinates_list","appium fixed hours");
+     await testingUtilities.sleepNormal();
+
+     if (global.platformName == "android") {
+        await interactions.scrollDown(interactions.scrollValue.NORMAL);
+        currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+    } else {
+        currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+    }
+    criteria(`And fixed hours employee has ${currentSicknessCount} sicknesses`);
+
+     criteria("When I log a sickness for a fixed hours employee");
+
+     if (global.platformName == "android") {
+         await interactions.clickOn("add");
+         await assertions.viewIsPresent("add_sickness");
+         await interactions.clickOn("add_sickness");
+     } else {
+         await interactions.clickOn("Add");
+         await assertions.viewIsPresent("Add sickness");
+         await interactions.clickOn("Add sickness");
+     }
+
+    criteria("When I log a sickness for a fixed hours employee");
+    await testingUtilities.sleepNormal();
+    await interactions.clickOnByText("subordinates_list","appium fixed hours");
+    await testingUtilities.sleepShort();
+    isOngoingAbsence = await testingUtilities.getValueFromView("ongoing_absence_switch");
+    if (isOngoingAbsence == '1' || 'ON') await interactions.clickOn("ongoing_absence_switch");
+ 
+    await selectValidDays(1);
+    var sicknessDate = await testingUtilities.getValueFromView("start_date");
+    criteria(`And I select a sickness for ${sicknessDate}`);
+    await interactions.clickOnFAB();
+
+    criteria("Then I am presented with the 'What time?' screen");
+    await assertions.viewHasText("toolbar_title", "What time?");
+
+    criteria('When I add A full day of sickness');
+    global.platformName == "android" ? await selectSicknessTime(1) : await interactions.clickOn("Full day");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_subtitle", "1 day selected");
+    await interactions.clickOnFAB();
+
+    criteria("And I am presented with the summary screen");
+    if (global.platformName == "iOS") await assertions.viewHasText("toolbar_title", "Summary");
+    await assertions.viewHasText("summary_absence_type", "Sickness") 
+
+    criteria("Then the values shown on summary screen should be correct")
+    global.platformName == "android" ? expectedStartDay = "Full day" : expectedStartDay = "Full Day"
+    await assertions.viewHasText("start_day_option", expectedStartDay);
+    await assertions.viewHasText("start_date", sicknessDate);
+    
+    criteria("When I confirm the sickness");
+    await interactions.clickOnFAB();
+
+    criteria("Then I should have an additonal sickness");
+    await testingUtilities.sleepShort();
+    var sicknessIncrease = await getIncreasedSicknessValue(currentSicknessCount);
+    if (global.platformName == "android") {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+    global.platformName == "android" ? await interactions.clickOn("close") : await interactions.clickOn("Close Screen");
+
+    await loginLogout.logout();
+    await loginLogout.login(loginLogout.users.fixedHours);
+
+    criteria("Given I am logged in as a fixed hours employee");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+    await interactions.clickOn("profile_icon");
+    await testingUtilities.sleepNormal();
+
+    criteria("When I view sickness on my profile");
+    if (global.platformName == "android") await interactions.scrollDown(interactions.scrollValue.NORMAL);
+    await testingUtilities.sleepNormal();
+
+    criteria(`Then I should have ${sicknessIncrease} sicknesses`);
+    if (global.platformName == "android") { 
+        currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+        await assertions.viewHasText("sicknesses_count",sicknessIncrease);
+        await interactions.clickOnByText("sickness_card", "Sicknesses");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+        await assertions.viewHasText("sickness_count", sicknessIncrease);
+        await interactions.clickOn("sickness_card");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+ })  
+
+ test("As as admin I can log sickness for a variable hours employee", async () => {
+    criteria("Given I am logged in as an administrator");
+    await testingUtilities.sleepShort();
+    await assertions.viewIsPresent("profile_icon");
+
+     global.platformName == "android" ? await interactions.clickOn("employees") : await interactions.clickOn("Employees");
+     await interactions.clickOnByText("subordinates_list","appium variable");
+     await testingUtilities.sleepNormal();
+
+     if (global.platformName == "android") {
+         await interactions.scrollDown(interactions.scrollValue.NORMAL);
+         currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+    } else {
+        currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+    }
+    criteria(`And variable hours employee has ${currentSicknessCount} sicknesses`);
+
+    criteria("When I log a sickness for a variable hours employee");
+    if (global.platformName == "android") {
+        await interactions.clickOn("add");
+        await assertions.viewIsPresent("add_sickness");
+        await interactions.clickOn("add_sickness");
+    } else {
+        await interactions.clickOn("Add");
+        await assertions.viewIsPresent("Add sickness");
+        await interactions.clickOn("Add sickness");
+    }
+    await interactions.clickOnByText("subordinates_list","appium variable");
+    await testingUtilities.sleepShort();
+
+    isOngoingAbsence = await testingUtilities.getValueFromView("ongoing_absence_switch");
+    if (isOngoingAbsence == '1' || 'ON') await interactions.clickOn("ongoing_absence_switch");
+
+    await selectValidDays(1, true);
+    var sicknessDate = await testingUtilities.getValueFromView("start_date");
+    criteria(`And I select a sickness for ${sicknessDate}`);
+    await interactions.clickOnFAB();
+
+    criteria("Then I am presented with the 'Working days missed' screen");
+    if (global.platform == "iOS") await assertions.viewHasText("toolbar_title", "Working days missed");
+
+    criteria('When I click to proceed');
+    await interactions.scrollDown();
+    await interactions.clickOnFAB();
+
+    criteria("And I am presented with the summary screen");
+    if(global.platformName == "iOS") await assertions.viewHasText("toolbar_title", "Summary");
+    await assertions.viewHasText("summary_absence_type", "Sickness")
+
+    criteria("Then the values shown on summary screen should be correct")
+    await assertions.viewHasText("start_date", sicknessDate);
+    
+    criteria("When I confirm the sickness");
+    await interactions.clickOnFAB();
+
+    criteria("Then the employee should have an additonal sickness");
+    await testingUtilities.sleepShort();
+    var sicknessIncrease = await getIncreasedSicknessValue(currentSicknessCount);
+    if (global.platformName == "android") {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+    global.platformName == "android" ? await interactions.clickOn("close") : await interactions.clickOn("Close Screen");
+
+    await loginLogout.logout();
+    await loginLogout.login(loginLogout.users.vhe);
+
+    criteria("Given I am logged in as a variable hours employee");
+    await testingUtilities.sleepNormal();
+    await assertions.viewIsPresent("profile_icon");
+    await interactions.clickOn("profile_icon");
+    criteria("When I view sickness on my profile");
+
+    if (global.platformName == "android") { 
+        await testingUtilities.sleepNormal();
+        await interactions.scrollDown(interactions.scrollValue.NORMAL);
+        await testingUtilities.sleepNormal();
+        currentSicknessCount = await testingUtilities.getValueFromView("sicknesses_count");
+        await assertions.viewHasText("sicknesses_count",sicknessIncrease);
+        await testingUtilities.sleepShort();
+        await interactions.clickOnByText("sickness_card", "Sicknesses");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} Sicknesses this year`);
+    } else {
+         currentSicknessCount = await testingUtilities.getValueFromView("sickness_count");
+        await assertions.viewHasText("sickness_count", sicknessIncrease);
+        await interactions.clickOn("sickness_card");
+        await assertions.viewHasText("absence_list_subtitle", `${sicknessIncrease} occurrences this year`);
+    }
+
+    criteria(`Then I should have ${sicknessIncrease} sicknesses`);
+
+    await interactions.clickOn("toolbar_close");
+    await testingUtilities.sleepShort();
+    await interactions.clickOn("Go back");
+ }) 
+
+afterEach(async () => {
+    testCount++;
+    testingUtilities.printErrors(testCount);
+    await loginLogout.logout();
+});
+
+afterAll(async () => {
+    await global.driver.quit();
+});
+
+async function selectSicknessTime(amount) {
+    let sicknessTimes = await global.driver.elementsById("absence_description_TV");
+    await sicknessTimes[amount].click();
+}
+
+async function getIncreasedSicknessValue(value) {
+    let convertedValue = (parseInt(value) + 1);
+    return convertedValue.toString();
+}
+
+function criteria(text) {
+    console.log(text)
+}
+
+async function selectValidDays(startDay, isVhe = false) {
+    var isValid = false;
+    var day = startDay;
+    while (!isValid) {
+      await interactions.clickOnByText("date_picker", day.toString());
+      if (day != startDay) {
+        await interactions.clickOnByText("date_picker", day.toString());
+      }
+      await testingUtilities.sleepNormal();
+      if (isVhe == true) {
+          isValid = true;
+      }
+      else if (await testingUtilities.checkViewHasText("toolbar_subtitle", "This is not a working day")) {
+        console.log("Checking next day...");
+        day = day + 1;
+      } else {
+        isValid = true;
+      }
+    }
+  }
