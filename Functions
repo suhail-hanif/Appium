@@ -1,3 +1,5 @@
+//return value from a view, rather than just the view
+
 async function getValueFromView (name) {
   const view = await getView(name);
   var viewText;
@@ -8,5 +10,20 @@ async function getValueFromView (name) {
   }
   return viewText;
 }
+
+
+//scroll or swipe ios implementation
+
+  let action = new wd.TouchAction(global.driver);
+    action.press({
+      x: originCoordinates.x,
+      y: originCoordinates.y
+    });
+    action.moveTo({
+      x: destinationCoordinates.x,
+      y: destinationCoordinates.y
+    });
+    action.release();
+    await action.perform();
 
 
