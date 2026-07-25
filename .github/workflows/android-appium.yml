@@ -37,10 +37,6 @@ jobs:
 
           mkdir -p "$ANDROID_AVD_HOME"
 
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
-
           yes | sdkmanager --licenses || true
 
           sdkmanager \
@@ -49,8 +45,31 @@ jobs:
             "platforms;android-33" \
             "system-images;android-33;google_apis;x86_64"
 
-      - name: Create and Start Android Emulator
-        id: emulator
+      - name: Enable KVM
+        run: |
+          echo "===== KVM STATUS ====="
+
+          ls -la /dev/kvm || true
+
+          echo "===== CURRENT USER ====="
+          id
+
+          echo "===== CURRENT GROUPS ====="
+          groups
+
+          echo "===== KVM GROUP ====="
+          getent group kvm || true
+
+          echo "Granting KVM access..."
+
+          sudo chmod 666 /dev/kvm
+
+          echo "===== KVM STATUS AFTER PERMISSION CHANGE ====="
+          ls -la /dev/kvm
+
+          echo "KVM setup complete."
+
+      - name: Create Android Emulator
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
@@ -59,18 +78,7 @@ jobs:
 
           mkdir -p "$ANDROID_AVD_HOME"
 
-          echo "===== ANDROID ENVIRONMENT ====="
-          echo "HOME=$HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
-
-          echo "===== AVAILABLE AVDs BEFORE CREATION ====="
-          emulator -list-avds || true
-
           echo "===== CREATING AVD ====="
-
-          rm -rf "$ANDROID_AVD_HOME/test.avd"
-          rm -f "$ANDROID_AVD_HOME/test.ini"
 
           echo "no" | avdmanager create avd \
             --name test \
@@ -78,25 +86,27 @@ jobs:
             --device "pixel_2" \
             --force
 
-          echo "===== AVD FILES ====="
-          ls -la "$ANDROID_AVD_HOME"
-
-          echo "===== AVD DIRECTORY ====="
-          ls -la "$ANDROID_AVD_HOME/test.avd" || true
-
-          echo "===== AVAILABLE AVDs AFTER CREATION ====="
+          echo "===== AVAILABLE AVDS ====="
           emulator -list-avds
 
           if ! emulator -list-avds | grep -qx "test"; then
-            echo "ERROR: AVD 'test' was not created successfully."
-
-            echo "===== AVD DIRECTORY ====="
-            find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print || true
-
+            echo "ERROR: AVD 'test' was not created."
             exit 1
           fi
 
           echo "AVD 'test' successfully created."
+
+      - name: Start Android Emulator
+        id: emulator
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_AVD_HOME=$HOME/.android/avd
+          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+          echo "===== KVM CHECK ====="
+
+          ls -la /dev/kvm
 
           echo "===== STARTING EMULATOR ====="
 
@@ -115,8 +125,9 @@ jobs:
 
           echo "Emulator PID: $EMULATOR_PID"
 
-          echo "===== INITIAL EMULATOR LOG ====="
           sleep 5
+
+          echo "===== INITIAL EMULATOR LOG ====="
           cat emulator.log || true
 
           echo "===== WAITING FOR ADB ====="
@@ -135,9 +146,11 @@ jobs:
             fi
 
             sleep 2
+
           done
 
           if ! adb devices | grep -q "emulator-5554[[:space:]]*device"; then
+
             echo "ERROR: Emulator did not become available through ADB."
 
             echo "===== ADB DEVICES ====="
@@ -150,6 +163,7 @@ jobs:
             ps aux | grep emulator || true
 
             exit 1
+
           fi
 
           echo "ADB connected successfully."
@@ -197,19 +211,7 @@ jobs:
             fi
 
             sleep 5
-          done
 
-          echo "===== WAITING FOR PACKAGE MANAGER ====="
-
-          for i in {1..60}; do
-
-            if adb -s emulator-5554 shell pm path android >/dev/null 2>&1; then
-              echo "Android package manager is ready."
-              break
-            fi
-
-            echo "Waiting for package manager... ($i/60)"
-            sleep 2
           done
 
           echo "===== DISABLING ANIMATIONS ====="
@@ -238,8 +240,6 @@ jobs:
 
           echo "Appium PID: $APPIUM_PID"
 
-          echo "Waiting for Appium..."
-
           for i in {1..30}; do
 
             if curl -s http://127.0.0.1:4723/status > /dev/null; then
@@ -254,10 +254,7 @@ jobs:
 
           if ! curl -s http://127.0.0.1:4723/status > /dev/null; then
             echo "ERROR: Appium failed to start."
-
-            echo "===== APPIUM LOG ====="
             cat appium.log || true
-
             exit 1
           fi
 
