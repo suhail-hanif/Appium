@@ -1,0 +1,15 @@
+{
+  "name": "Appium",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@wdio/appium-service": "^9.30.0",
+    "@wdio/cli": "^9.30.0",
+    "@wdio/globals": "^9.29.1",
+    "@wdio/local-runner": "^9.30.0",
+    "@wdio/mocha-framework": "^9.30.0",
+    "@wdio/spec-reporter": "^9.29.1",
+    "appium-uiautomator2-driver": "^8.1.2",
+    "expect-webdriverio": "^5.7.0"
+  }
+}
