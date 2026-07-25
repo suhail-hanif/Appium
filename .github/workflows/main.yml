@@ -52,4 +52,4 @@ jobs:
             sleep 10
 
             # Run WebdriverIO tests
-            npm run test:android
+            npm run wdio
