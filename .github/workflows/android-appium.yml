@@ -28,26 +28,30 @@ jobs:
 
     - name: Install Android Emulator Image
       run: |
-        sdkmanager "platform-tools" \
+        echo "Installing Android SDK components"
+
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
           "platforms;android-34" \
+          "emulator" \
           "system-images;android-34;google_apis;x86_64"
 
+        echo "Android SDK components installed"
 
     - name: Create Android Emulator
       run: |
-        echo "no" | avdmanager create avd \
+        echo "no" | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
           -n test \
           -k "system-images;android-34;google_apis;x86_64" \
           --force
 
         echo "AVD created"
 
-
     - name: Start Android Emulator
       run: |
-        echo "Starting emulator..."
+        echo "Starting emulator"
 
-        nohup emulator \
+        nohup $ANDROID_HOME/emulator/emulator \
           -avd test \
           -no-window \
           -no-audio \
@@ -55,11 +59,9 @@ jobs:
           -gpu swiftshader_indirect \
           > emulator.log 2>&1 &
 
-        echo "Waiting for emulator device..."
+        echo "Waiting for emulator"
 
         adb wait-for-device
-
-        echo "Device connected"
 
         timeout 300 bash -c '
         until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
@@ -69,8 +71,6 @@ jobs:
         '
 
         adb shell input keyevent 82
-
-        echo "Emulator ready"
 
         adb devices
 
