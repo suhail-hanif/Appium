@@ -7,37 +7,29 @@ on:
 
 jobs:
   android-tests:
-
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Install Appium
         run: |
+          npm ci
           npm install -g appium
 
       - name: Setup Android SDK
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export ANDROID_AVD_HOME=$HOME/.android/avd
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
           export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-
-          mkdir -p "$ANDROID_AVD_HOME"
-
-          yes | sdkmanager --licenses || true
 
           sdkmanager \
             "platform-tools" \
@@ -46,39 +38,16 @@ jobs:
             "system-images;android-33;google_apis;x86_64"
 
       - name: Enable KVM
-        run: |
-          echo "===== KVM STATUS ====="
+        run: sudo chmod 666 /dev/kvm
 
-          ls -la /dev/kvm || true
-
-          echo "===== CURRENT USER ====="
-          id
-
-          echo "===== CURRENT GROUPS ====="
-          groups
-
-          echo "===== KVM GROUP ====="
-          getent group kvm || true
-
-          echo "Granting KVM access..."
-
-          sudo chmod 666 /dev/kvm
-
-          echo "===== KVM STATUS AFTER PERMISSION CHANGE ====="
-          ls -la /dev/kvm
-
-          echo "KVM setup complete."
-
-      - name: Create Android Emulator
+      - name: Create and start emulator
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
           export ANDROID_AVD_HOME=$HOME/.android/avd
           export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
           mkdir -p "$ANDROID_AVD_HOME"
-
-          echo "===== CREATING AVD ====="
 
           echo "no" | avdmanager create avd \
             --name test \
@@ -86,31 +55,7 @@ jobs:
             --device "pixel_2" \
             --force
 
-          echo "===== AVAILABLE AVDS ====="
-          emulator -list-avds
-
-          if ! emulator -list-avds | grep -qx "test"; then
-            echo "ERROR: AVD 'test' was not created."
-            exit 1
-          fi
-
-          echo "AVD 'test' successfully created."
-
-      - name: Start Android Emulator
-        id: emulator
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export ANDROID_AVD_HOME=$HOME/.android/avd
-          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-
-          echo "===== KVM CHECK ====="
-
-          ls -la /dev/kvm
-
-          echo "===== STARTING EMULATOR ====="
-
-          nohup emulator \
+          emulator \
             -avd test \
             -no-window \
             -no-audio \
@@ -118,172 +63,22 @@ jobs:
             -no-snapshot \
             -wipe-data \
             -gpu swiftshader_indirect \
-            -no-metrics \
             > emulator.log 2>&1 &
 
-          EMULATOR_PID=$!
+          adb wait-for-device
 
-          echo "Emulator PID: $EMULATOR_PID"
+          timeout 300 bash -c \
+            'until adb shell getprop sys.boot_completed | grep -m 1 "1"; do sleep 5; done'
 
-          sleep 5
-
-          echo "===== INITIAL EMULATOR LOG ====="
-          cat emulator.log || true
-
-          echo "===== WAITING FOR ADB ====="
-
-          adb start-server
-
-          for i in {1..60}; do
-
-            echo "Waiting for ADB... ($i/60)"
-
-            adb devices -l || true
-
-            if adb devices | grep -q "emulator-5554[[:space:]]*device"; then
-              echo "ADB device detected."
-              break
-            fi
-
-            sleep 2
-
-          done
-
-          if ! adb devices | grep -q "emulator-5554[[:space:]]*device"; then
-
-            echo "ERROR: Emulator did not become available through ADB."
-
-            echo "===== ADB DEVICES ====="
-            adb devices -l || true
-
-            echo "===== EMULATOR LOG ====="
-            cat emulator.log || true
-
-            echo "===== RUNNING EMULATOR PROCESSES ====="
-            ps aux | grep emulator || true
-
-            exit 1
-
-          fi
-
-          echo "ADB connected successfully."
-
-          echo "===== WAITING FOR ANDROID BOOT ====="
-
-          BOOT_TIMEOUT=300
-          START_TIME=$(date +%s)
-
-          while true; do
-
-            CURRENT_TIME=$(date +%s)
-            ELAPSED=$((CURRENT_TIME - START_TIME))
-
-            BOOT_COMPLETED=$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
-            DEV_BOOT_COMPLETED=$(adb -s emulator-5554 shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r' || true)
-            BOOT_ANIM=$(adb -s emulator-5554 shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r' || true)
-
-            echo "Boot status: sys.boot_completed=$BOOT_COMPLETED dev.bootcomplete=$DEV_BOOT_COMPLETED bootanim=$BOOT_ANIM elapsed=${ELAPSED}s"
-
-            if [ "$BOOT_COMPLETED" = "1" ] || [ "$DEV_BOOT_COMPLETED" = "1" ]; then
-              echo "Android boot completed."
-              break
-            fi
-
-            if [ "$ELAPSED" -ge "$BOOT_TIMEOUT" ]; then
-
-              echo "ERROR: Android emulator failed to boot within ${BOOT_TIMEOUT} seconds."
-
-              echo "===== ADB DEVICES ====="
-              adb devices -l || true
-
-              echo "===== ANDROID PROPERTIES ====="
-              adb -s emulator-5554 shell getprop ro.build.version.release || true
-              adb -s emulator-5554 shell getprop ro.build.version.sdk || true
-              adb -s emulator-5554 shell getprop ro.product.cpu.abi || true
-              adb -s emulator-5554 shell getprop sys.boot_completed || true
-              adb -s emulator-5554 shell getprop dev.bootcomplete || true
-              adb -s emulator-5554 shell getprop init.svc.bootanim || true
-
-              echo "===== EMULATOR LOG ====="
-              cat emulator.log || true
-
-              exit 1
-            fi
-
-            sleep 5
-
-          done
-
-          echo "===== DISABLING ANIMATIONS ====="
-
-          adb -s emulator-5554 shell settings put global window_animation_scale 0
-          adb -s emulator-5554 shell settings put global transition_animation_scale 0
-          adb -s emulator-5554 shell settings put global animator_duration_scale 0
-
-          echo "===== FINAL DEVICE STATUS ====="
-
-          adb devices -l
-
-          adb -s emulator-5554 shell getprop ro.build.version.release
-          adb -s emulator-5554 shell getprop ro.build.version.sdk
-          adb -s emulator-5554 shell getprop sys.boot_completed
-
-          echo "Android emulator is ready."
-
-      - name: Start Appium
-        run: |
-          echo "Starting Appium..."
-
-          appium --log-level info > appium.log 2>&1 &
-
-          APPIUM_PID=$!
-
-          echo "Appium PID: $APPIUM_PID"
-
-          for i in {1..30}; do
-
-            if curl -s http://127.0.0.1:4723/status > /dev/null; then
-              echo "Appium is ready."
-              break
-            fi
-
-            echo "Waiting for Appium... ($i/30)"
-            sleep 2
-
-          done
-
-          if ! curl -s http://127.0.0.1:4723/status > /dev/null; then
-            echo "ERROR: Appium failed to start."
-            cat appium.log || true
-            exit 1
-          fi
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
 
       - name: Run WebdriverIO tests
-        run: |
-          echo "Running WebdriverIO tests..."
-          npm run wdio
+        run: npm run wdio
 
-      - name: Collect Android diagnostics
-        if: always()
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export ANDROID_AVD_HOME=$HOME/.android/avd
-          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
-
-          echo "===== ADB DEVICES ====="
-          adb devices -l || true
-
-          echo "===== BOOT STATUS ====="
-          adb -s emulator-5554 shell getprop sys.boot_completed || true
-          adb -s emulator-5554 shell getprop dev.bootcomplete || true
-          adb -s emulator-5554 shell getprop init.svc.bootanim || true
-
-          echo "===== LOGCAT ====="
-          adb -s emulator-5554 logcat -d -t 500 || true
-
-      - name: Upload test and diagnostic logs
-        if: always()
+      - name: Upload logs
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: android-appium-logs
