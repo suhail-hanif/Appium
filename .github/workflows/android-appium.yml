@@ -32,28 +32,45 @@ jobs:
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_AVD_HOME=$HOME/.android/avd
           export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+          mkdir -p "$ANDROID_AVD_HOME"
 
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
 
-          echo "Accepting Android SDK licences..."
           yes | sdkmanager --licenses || true
 
-          echo "Installing Android SDK components..."
           sdkmanager \
             "platform-tools" \
             "emulator" \
             "platforms;android-33" \
             "system-images;android-33;google_apis;x86_64"
 
-      - name: Create Android Emulator
+      - name: Create and Start Android Emulator
+        id: emulator
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_AVD_HOME=$HOME/.android/avd
           export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
-          echo "Creating AVD..."
+          mkdir -p "$ANDROID_AVD_HOME"
+
+          echo "===== ANDROID ENVIRONMENT ====="
+          echo "HOME=$HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
+
+          echo "===== AVAILABLE AVDs BEFORE CREATION ====="
+          emulator -list-avds || true
+
+          echo "===== CREATING AVD ====="
+
+          rm -rf "$ANDROID_AVD_HOME/test.avd"
+          rm -f "$ANDROID_AVD_HOME/test.ini"
 
           echo "no" | avdmanager create avd \
             --name test \
@@ -61,17 +78,27 @@ jobs:
             --device "pixel_2" \
             --force
 
-          echo "AVD created:"
+          echo "===== AVD FILES ====="
+          ls -la "$ANDROID_AVD_HOME"
+
+          echo "===== AVD DIRECTORY ====="
+          ls -la "$ANDROID_AVD_HOME/test.avd" || true
+
+          echo "===== AVAILABLE AVDs AFTER CREATION ====="
           emulator -list-avds
 
-      - name: Start Android Emulator
-        id: emulator
-        run: |
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+          if ! emulator -list-avds | grep -qx "test"; then
+            echo "ERROR: AVD 'test' was not created successfully."
 
-          echo "Starting Android emulator..."
+            echo "===== AVD DIRECTORY ====="
+            find "$ANDROID_AVD_HOME" -maxdepth 2 -type f -print || true
+
+            exit 1
+          fi
+
+          echo "AVD 'test' successfully created."
+
+          echo "===== STARTING EMULATOR ====="
 
           nohup emulator \
             -avd test \
@@ -85,40 +112,55 @@ jobs:
             > emulator.log 2>&1 &
 
           EMULATOR_PID=$!
+
           echo "Emulator PID: $EMULATOR_PID"
 
-          echo "Waiting for ADB device..."
+          echo "===== INITIAL EMULATOR LOG ====="
+          sleep 5
+          cat emulator.log || true
+
+          echo "===== WAITING FOR ADB ====="
 
           adb start-server
 
           for i in {1..60}; do
+
+            echo "Waiting for ADB... ($i/60)"
+
+            adb devices -l || true
+
             if adb devices | grep -q "emulator-5554[[:space:]]*device"; then
               echo "ADB device detected."
               break
             fi
 
-            echo "Waiting for ADB... ($i/60)"
-            adb devices || true
             sleep 2
           done
 
           if ! adb devices | grep -q "emulator-5554[[:space:]]*device"; then
             echo "ERROR: Emulator did not become available through ADB."
+
             echo "===== ADB DEVICES ====="
             adb devices -l || true
+
             echo "===== EMULATOR LOG ====="
             cat emulator.log || true
+
+            echo "===== RUNNING EMULATOR PROCESSES ====="
+            ps aux | grep emulator || true
+
             exit 1
           fi
 
           echo "ADB connected successfully."
 
-          echo "Waiting for Android to finish booting..."
+          echo "===== WAITING FOR ANDROID BOOT ====="
 
           BOOT_TIMEOUT=300
           START_TIME=$(date +%s)
 
           while true; do
+
             CURRENT_TIME=$(date +%s)
             ELAPSED=$((CURRENT_TIME - START_TIME))
 
@@ -134,6 +176,7 @@ jobs:
             fi
 
             if [ "$ELAPSED" -ge "$BOOT_TIMEOUT" ]; then
+
               echo "ERROR: Android emulator failed to boot within ${BOOT_TIMEOUT} seconds."
 
               echo "===== ADB DEVICES ====="
@@ -156,11 +199,10 @@ jobs:
             sleep 5
           done
 
-          echo "Waiting for Android package manager..."
-
-          adb -s emulator-5554 wait-for-device
+          echo "===== WAITING FOR PACKAGE MANAGER ====="
 
           for i in {1..60}; do
+
             if adb -s emulator-5554 shell pm path android >/dev/null 2>&1; then
               echo "Android package manager is ready."
               break
@@ -170,19 +212,21 @@ jobs:
             sleep 2
           done
 
-          echo "Disabling animations..."
+          echo "===== DISABLING ANIMATIONS ====="
 
           adb -s emulator-5554 shell settings put global window_animation_scale 0
           adb -s emulator-5554 shell settings put global transition_animation_scale 0
           adb -s emulator-5554 shell settings put global animator_duration_scale 0
 
-          echo "Emulator is ready."
-
           echo "===== FINAL DEVICE STATUS ====="
+
           adb devices -l
+
           adb -s emulator-5554 shell getprop ro.build.version.release
           adb -s emulator-5554 shell getprop ro.build.version.sdk
           adb -s emulator-5554 shell getprop sys.boot_completed
+
+          echo "Android emulator is ready."
 
       - name: Start Appium
         run: |
@@ -191,11 +235,13 @@ jobs:
           appium --log-level info > appium.log 2>&1 &
 
           APPIUM_PID=$!
+
           echo "Appium PID: $APPIUM_PID"
 
           echo "Waiting for Appium..."
 
           for i in {1..30}; do
+
             if curl -s http://127.0.0.1:4723/status > /dev/null; then
               echo "Appium is ready."
               break
@@ -203,12 +249,15 @@ jobs:
 
             echo "Waiting for Appium... ($i/30)"
             sleep 2
+
           done
 
           if ! curl -s http://127.0.0.1:4723/status > /dev/null; then
             echo "ERROR: Appium failed to start."
+
             echo "===== APPIUM LOG ====="
             cat appium.log || true
+
             exit 1
           fi
 
@@ -222,6 +271,7 @@ jobs:
         run: |
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_AVD_HOME=$HOME/.android/avd
           export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
           echo "===== ADB DEVICES ====="
