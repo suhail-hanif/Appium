@@ -14,7 +14,7 @@
     "expect-webdriverio": "^5.7.0"
   },
   "scripts": {
-    "wdio": "wdio run ./wdio.conf.ts"
+    "wdio": "wdio run ./wdio.local.ts"
   },
   "dependencies": {
     "appium": "^3.6.0"
