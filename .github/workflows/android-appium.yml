@@ -35,26 +35,22 @@ jobs:
       run: |
         npm install -g appium
 
-    - name: Install Android Emulator Image
+    - name: Install Android SDK components
       run: |
-        echo "Installing Android SDK components"
+        yes | sdkmanager --licenses
 
-        yes | sdkmanager \
+        sdkmanager \
           "platform-tools" \
-          "platforms;android-34" \
+          "platforms;android-33" \
           "emulator" \
-          "system-images;android-34;google_apis;x86_64"
-
-        echo "Android SDK setup complete"
+          "system-images;android-33;google_apis;x86_64"
 
 
     - name: Create Android Emulator
       run: |
-        echo "Creating AVD"
-
         echo "no" | avdmanager create avd \
           -n test \
-          -k "system-images;android-34;google_apis;x86_64" \
+          -k "system-images;android-33;google_apis;x86_64" \
           --force
 
         echo "AVD created"
@@ -63,6 +59,7 @@ jobs:
     - name: Start Android Emulator
       timeout-minutes: 10
       run: |
+
         echo "Starting emulator"
 
         emulator \
@@ -70,23 +67,31 @@ jobs:
           -no-window \
           -no-audio \
           -no-boot-anim \
-          -gpu swiftshader_indirect \
           -no-snapshot \
+          -gpu swiftshader_indirect \
+          -memory 2048 \
+          -verbose \
           > emulator.log 2>&1 &
+
 
         echo "Waiting for emulator device"
 
         adb wait-for-device
 
+
         echo "Device detected"
 
         adb devices
 
-        echo "Checking boot status"
+
+        echo "Waiting for Android boot"
+
 
         timeout 300 bash -c '
         while true; do
+
           BOOT=$(adb shell getprop sys.boot_completed | tr -d "\r")
+
           echo "Boot status: $BOOT"
 
           if [ "$BOOT" = "1" ]; then
@@ -94,23 +99,59 @@ jobs:
           fi
 
           sleep 5
+
         done
         '
 
-        echo "Unlocking device"
+
+        echo "Disabling animations"
+
+        adb shell settings put global window_animation_scale 0
+        adb shell settings put global transition_animation_scale 0
+        adb shell settings put global animator_duration_scale 0
+
 
         adb shell input keyevent 82
 
-        echo "Emulator ready"
+
+        echo "Android emulator ready"
+
 
     - name: Emulator diagnostics
       if: always()
       run: |
-        adb devices
+        adb devices || true
         adb shell getprop ro.product.model || true
         adb shell getprop ro.build.version.release || true
         tail -100 emulator.log || true
 
+
+    - name: Start Appium Server
+      run: |
+
+        echo "Starting Appium"
+
+        appium \
+          --log-level info \
+          > appium.log 2>&1 &
+
+
+        sleep 10
+
+
+        curl http://127.0.0.1:4723/status
+
+
     - name: Run WebdriverIO Tests
       run: |
         npm run wdio
+
+
+    - name: Upload logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-test-logs
+        path: |
+          emulator.log
+          appium.log
