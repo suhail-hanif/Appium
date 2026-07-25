@@ -3,51 +3,77 @@ name: Android Appium Tests
 on:
   push:
     branches:
-      - master
-  pull_request:
+      - main
+  workflow_dispatch:
 
 jobs:
   android-tests:
+
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      # Setup Node
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # Install dependencies
-      - name: Install npm packages
-        run: npm ci
 
-      # Install Appium
-      - name: Install Appium
-        run: |
-          npm install -g appium
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
 
-      # Setup Android SDK
-      - name: Setup Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          emulator-options: -no-window -no-audio -no-boot-anim
-          disable-animations: true
-          script: |
-            adb devices
+    - name: Install npm dependencies
+      run: npm ci
 
-            # Start Appium server
-            appium --log-level info > appium.log 2>&1 &
+    - name: Install Android Emulator Image
+      run: |
+        sdkmanager "platform-tools" \
+          "platforms;android-34" \
+          "system-images;android-34;google_apis;x86_64"
 
-            # Wait for Appium
-            sleep 10
 
-            # Run WebdriverIO tests
-            npm run wdio
+    - name: Create Android Emulator
+      run: |
+        echo "no" | avdmanager create avd \
+          -n test \
+          -k "system-images;android-34;google_apis;x86_64" \
+          --force
+
+        echo "AVD created"
+
+
+    - name: Start Android Emulator
+      run: |
+        echo "Starting emulator..."
+
+        nohup emulator \
+          -avd test \
+          -no-window \
+          -no-audio \
+          -no-boot-anim \
+          -gpu swiftshader_indirect \
+          > emulator.log 2>&1 &
+
+        echo "Waiting for emulator device..."
+
+        adb wait-for-device
+
+        echo "Device connected"
+
+        timeout 300 bash -c '
+        until adb shell getprop sys.boot_completed | grep -m 1 "1"; do
+          echo "Waiting for Android boot..."
+          sleep 5
+        done
+        '
+
+        adb shell input keyevent 82
+
+        echo "Emulator ready"
+
+        adb devices
+
+    - name: Run WebdriverIO Tests
+      run: |
+        npm run wdio
