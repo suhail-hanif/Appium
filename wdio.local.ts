@@ -57,11 +57,12 @@ export const config: WebdriverIO.Config = {
         platformName: 'Android',
         'appium:adbExecTimeout': 60000,
         'appium:deviceName': 'R9TY106C1FV',
-        // 'appium:autoGrantPermissions': 'true',
-        // 'appium:autoAcceptAlerts': 'true',
+        'appium:autoGrantPermissions': 'true',
+        'appium:autoAcceptAlerts': 'true',
         'appium:platformVersion': '16.0',
         'appium:automationName': 'UiAutomator2',
-        'appium:app': 'apps/wikipedia.apk'
+        'appium:app': 'apps/sample.apk'
+
     }],
 
     //
