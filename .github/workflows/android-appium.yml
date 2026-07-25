@@ -3,7 +3,11 @@ name: Android Appium Tests
 on:
   push:
     branches:
+<<<<<<< HEAD
       - master
+=======
+      - main
+>>>>>>> b54798ddaa26c269ae7902915d1d9c844372994f
   workflow_dispatch:
 
 jobs:
