@@ -2,6 +2,7 @@
   "name": "Appium",
   "type": "module",
   "devDependencies": {
+    "@gmangiapelo/wdio-azure-devops-service": "^0.1.0",
     "@types/node": "^26.1.1",
     "@wdio/appium-service": "^9.30.0",
     "@wdio/cli": "^9.30.0",
@@ -11,5 +12,17 @@
     "@wdio/spec-reporter": "^9.29.1",
     "appium-uiautomator2-driver": "^8.1.2",
     "expect-webdriverio": "^5.7.0"
+  },
+  "scripts": {
+    "wdio": "wdio run ./wdio.conf.ts"
+  },
+  "dependencies": {
+    "appium": "^3.6.0"
+  },
+  "allowScripts": {
+    "appium@3.6.0": true,
+    "edgedriver@6.3.0": true,
+    "esbuild@0.28.1": true,
+    "geckodriver@6.1.1": true
   }
 }
