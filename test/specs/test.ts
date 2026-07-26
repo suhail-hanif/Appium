@@ -27,7 +27,7 @@ describe('Product detail tests', () => {
 
        const productImage = await homePage.productImage;
        await productImage.waitForDisplayed({ timeout: 10000 });
-       await productImage.click();
+       await expect(productImage).toBeDisplayed();
     });
 });
 
@@ -37,8 +37,12 @@ describe('Cart page tests', () => {
         await cartIcon.waitForDisplayed({ timeout: 10000 });
         await cartIcon.click();
 
-        const cartScreenTitle = await cartPage.cartScreenTitle;
-        await cartScreenTitle.waitForDisplayed({ timeout: 10000 });
-        await expect(cartScreenTitle).toBeDisplayed();
+        const emptyCartMsg = await cartPage.emptyCartMsg;
+        await emptyCartMsg.waitForDisplayed({ timeout: 10000 });
+        await expect(emptyCartMsg).toBeDisplayed();
+
+        const goShoppingBtn = await cartPage.goShoppingBtn;
+        await goShoppingBtn.waitForDisplayed({ timeout: 10000 });
+        await expect(goShoppingBtn).toBeDisplayed();
     });
 });
