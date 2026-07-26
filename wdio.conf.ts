@@ -56,8 +56,9 @@ export const config: WebdriverIO.Config = {
         // capabilities for local Appium web tests on an Android Emulator
         platformName: 'Android',
         'appium:adbExecTimeout': 60000,
-        'appium:autoGrantPermissions': 'true',
-        'appium:autoAcceptAlerts': 'true',
+        'appium:autoGrantPermissions': true,
+        'appium:autoAcceptAlerts': true,
+        'appium:fullReset': true,
         'appium:platformVersion': '13',
         'appium:automationName': 'UiAutomator2',
         'appium:app': 'apps/sample.apk'
