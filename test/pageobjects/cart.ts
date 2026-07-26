@@ -8,8 +8,12 @@ class cartPage extends Page {
     /**
      * Define selectors for common elements in the sample app
      */
-    public get cartScreenTitle () {
-        return $('~cart_screen_title');
+    public get emptyCartMsg () {
+        return $('android=new UiSelector().text("Oh no! Your cart is empty. Fill it up with swag to complete your purchase.")');
+    }
+
+    public get goShoppingBtn () {
+        return $('android=new UiSelector().text("Go Shopping")');
     }
 
 }
