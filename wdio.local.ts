@@ -59,7 +59,7 @@ export const config: WebdriverIO.Config = {
        // 'appium:deviceName': 'Pixel_6',
         'appium:autoGrantPermissions': 'true',
         'appium:autoAcceptAlerts': 'true',
-        'appium:platformVersion': '14',
+        'appium:platformVersion': '13',
         'appium:automationName': 'UiAutomator2',
         'appium:app': 'apps/sample.apk'
 

@@ -7,65 +7,81 @@ on:
 
 jobs:
   android-tests:
-
     runs-on: ubuntu-latest
 
     steps:
 
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-        cache: npm
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g appium
 
-    - name: Install Appium
-      run: |
-        npm install -g appium
+      - name: Setup Android SDK
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
-    - name: Android Emulator and Tests
-      uses: reactivecircus/android-emulator-runner@v2
-      with:
-        api-level: 33
-        target: google_apis
-        arch: x86_64
-        avd-name: test
-        force-avd-creation: true
-        cores: 2
-        emulator-boot-timeout: 600
-        disable-animations: true
-        disable-spellchecker: true
-        emulator-options: >
-          -no-window
-          -no-audio
-          -no-boot-anim
-          -no-snapshot
-          -gpu swiftshader_indirect
+          sdkmanager \
+            "platform-tools" \
+            "emulator" \
+            "platforms;android-33" \
+            "system-images;android-33;google_apis;x86_64"
 
-        script: |
-          echo "Emulator started"
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
 
-          adb devices
+      - name: Create and start emulator
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export ANDROID_AVD_HOME=$HOME/.android/avd
+          export PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 
-          echo "Starting Appium"
+          mkdir -p "$ANDROID_AVD_HOME"
 
-          appium --log-level info > appium.log 2>&1 &
+          echo "no" | avdmanager create avd \
+            --name test \
+            --package "system-images;android-33;google_apis;x86_64" \
+            --device "pixel_2" \
+            --force
 
-          sleep 15
+          emulator \
+            -avd test \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -wipe-data \
+            -gpu swiftshader_indirect \
+            > emulator.log 2>&1 &
 
-          echo "Running WebdriverIO tests"
+          adb wait-for-device
 
-          npm run wdio
+          timeout 300 bash -c \
+            'until adb shell getprop sys.boot_completed | grep -m 1 "1"; do sleep 5; done'
 
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
 
-    - name: Upload Appium logs
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: appium-logs
-        path: appium.log
+      - name: Run WebdriverIO tests
+        run: npm run wdio
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-appium-logs
+          path: |
+            appium.log
+            emulator.log
