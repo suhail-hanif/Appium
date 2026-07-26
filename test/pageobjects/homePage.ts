@@ -24,6 +24,9 @@ class homePage extends Page {
         return $('android=new UiSelector().description("Search")');
     }
 
+     get productItem() {
+        return $('~product_item_1');
+    }
 }
 
 export default new homePage();
