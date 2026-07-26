@@ -20,7 +20,7 @@ describe('Home page tests', () => {
 });
 
 describe('Product detail tests', () => {
-    it('should open a product and display the product details', async () => {
+    it('should display the product details', async () => {
        const productText = await homePage.productText;
        await productText.waitForDisplayed({ timeout: 10000 });
        await expect(productText).toBeDisplayed();
