@@ -24,8 +24,12 @@ class homePage extends Page {
         return $('android=new UiSelector().description("Search")');
     }
 
-     get productItem() {
-        return $('~product_item_1');
+    public get productText() {
+        return $('android=new UiSelector().text("Sauce Labs Backpack")');
+    }
+
+    public get productImage() {
+        return $('android=new UiSelector().description("Product Image").instance(0)');
     }
 }
 

@@ -75,7 +75,7 @@ jobs:
           adb shell settings put global animator_duration_scale 0
 
       - name: Run WebdriverIO tests
-        run: npm run wdio
+        run: npm run wdio:ci
 
       - name: Upload logs
         if: failure()

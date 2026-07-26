@@ -56,10 +56,10 @@ export const config: WebdriverIO.Config = {
         // capabilities for local Appium web tests on an Android Emulator
         platformName: 'Android',
         'appium:adbExecTimeout': 60000,
-       // 'appium:deviceName': 'Pixel_6',
+        'appium:deviceName': 'R9TY106C1FV',
         'appium:autoGrantPermissions': 'true',
         'appium:autoAcceptAlerts': 'true',
-        'appium:platformVersion': '13',
+        'appium:platformVersion': '16',
         'appium:automationName': 'UiAutomator2',
         'appium:app': 'apps/sample.apk'
 

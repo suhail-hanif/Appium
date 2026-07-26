@@ -5,21 +5,9 @@ export const config: WebdriverIO.Config = {
     // ====================
     // WebdriverIO supports running e2e tests as well as unit and component tests.
     runner: 'local',
-    tsConfigPath: './tsconfig.e2e.json',
-    //
-    // =====================
-    // Server Configurations
-    // =====================
-    // Host address of the running Selenium server. This information is usually obsolete as
-    // WebdriverIO automatically connects to localhost. Also, if you are using one of the
-    // supported cloud services like Sauce Labs, Browserstack, Testing Bot or LambdaTest you don't
-    // need to define host and port information because WebdriverIO can figure that out
-    // according to your user and key information. However, if you are using a private Selenium
-    // backend you should define the host address, port, and path here.
-    //
-    hostname: 'testinghost.com',
-    port: 80,
-    path: '',
+    tsConfigPath: './tsconfig.json',
+    
+    port: 4723,
     //
     // ==================
     // Specify Test Files
@@ -36,7 +24,7 @@ export const config: WebdriverIO.Config = {
     // of the config file unless it's absolute.
     //
     specs: [
-        // ToDo: define location for spec files here
+        './test/specs/**/*.ts'
     ],
     // Patterns to exclude.
     exclude: [
@@ -62,15 +50,17 @@ export const config: WebdriverIO.Config = {
     //
     // If you have trouble getting all important capabilities together, check out the
     // Sauce Labs platform configurator - a great tool to configure your capabilities:
-    // https://saucelabs.com/platform/platform-configurator
+    // https://saucelabs.com/platform/platform-configurator 
     //
     capabilities: [{
         // capabilities for local Appium web tests on an Android Emulator
         platformName: 'Android',
-        browserName: 'Chrome',
-        'appium:deviceName': 'Android GoogleAPI Emulator',
-        'appium:platformVersion': '12.0',
-        'appium:automationName': 'UiAutomator2'
+        'appium:adbExecTimeout': 60000,
+        'appium:autoGrantPermissions': 'true',
+        'appium:autoAcceptAlerts': 'true',
+        'appium:platformVersion': '13',
+        'appium:automationName': 'UiAutomator2',
+        'appium:app': 'apps/sample.apk'
     }],
 
     //
@@ -120,7 +110,7 @@ export const config: WebdriverIO.Config = {
     // Services take over a specific job you don't want to take care of. They enhance
     // your test setup with almost no effort. Unlike plugins, they don't add new
     // commands. Instead, they hook themselves up into the test process.
-    services: ['appium', 'azure-devops'],
+    services: ['appium'],
 
     // Framework you want to run your specs with.
     // The following are supported: Mocha, Jasmine, and Cucumber
